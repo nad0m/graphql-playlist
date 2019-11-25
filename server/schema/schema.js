@@ -7,7 +7,8 @@ const {
     GraphQLInt,
     GraphQLSchema,
     GraphQLID,
-    GraphQLList
+    GraphQLList,
+    GraphQLNonNull
 } = graphql;
 
 const {
@@ -25,8 +26,8 @@ const BookType = new GraphQLObjectType({
         genre: {type: GraphQLString},
         author: {
             type: AuthorType,
-            resolve(parent, args) {
-                return _.find(authors, {id: parent.authorId});
+            resolve: async (parent, args) => {
+                return await getDoc(AuthorCollection, parent.authorId);
             }
         }
     })
@@ -40,7 +41,8 @@ const AuthorType = new GraphQLObjectType({
         age: {type: GraphQLInt},
         books: {
             type: new GraphQLList(BookType),
-            resolve(parent, args) {
+            resolve: async (parent, args) => {
+                const books = await getCollection(BookCollection);
                 return books.filter((book) => book.authorId === parent.id);
             }
         }
@@ -53,19 +55,20 @@ const Mutation = new GraphQLObjectType({
         addAuthor: {
             type: AuthorType,
             args: {
-                name: {type: GraphQLString},
-                age: {type: GraphQLInt}
+                name: {type: new GraphQLNonNull(GraphQLString)},
+                age: {type: new GraphQLNonNull(GraphQLInt)}
             },
             resolve: async (parent, args) => {
                 const author = await addDoc(AuthorCollection, args);
                 return author;
             }
         },
-        addBooks: {
+        addBook: {
             type: BookType,
             args: {
-                name: {type: GraphQLString},
-                genre: {type: GraphQLString}
+                name: {type: new GraphQLNonNull(GraphQLString)},
+                genre: {type: new GraphQLNonNull(GraphQLString)},
+                authorId: {type: new GraphQLNonNull(GraphQLID)}
             },
             resolve: async (parent, args) => {
                 const book = await addDoc(BookCollection, args);
@@ -98,41 +101,20 @@ const RootQuery = new GraphQLObjectType({
         book: {
             type: BookType,
             args: {id: {type: GraphQLID}},
-            resolve(parent, args) {
+            resolve: async (parent, args) => {
                 // code to get data from db
-                return _.find(books, {id: args.id});
+                return getDoc(BookCollection, args.id);
             }
         },
         author: {
             type: AuthorType,
             args: {id: {type: GraphQLID}},
             resolve(parent, args) {
-
-                return _.find(authors, {id: args.id});
+                return getDoc(AuthorCollection, args.id);
             }
         }
     }
 });
-
-// dummy data
-var books = [
-    {name: 'Name of the wind', genre: 'Fantasy', id: '1', authorId: '1'},
-    {name: 'Final Empire', genre: 'Fantasy', id: '2', authorId: '2'},
-    {name: 'The Long Earth', genre: 'Fantasy', id: '3', authorId: '3'},
-    {name: 'Name of the wind 2', genre: 'Fantasy', id: '5', authorId: '1'},
-    {name: 'Final Empire 2', genre: 'Fantasy', id: '4', authorId: '2'},
-    {name: 'The Long Earth 2', genre: 'Fantasy', id: '9', authorId: '3'},
-    {name: 'Name of the wind 3', genre: 'Fantasy', id: '6', authorId: '1'},
-    {name: 'Final Empire 3', genre: 'Fantasy', id: '0', authorId: '2'},
-    {name: 'The Long Earth 3', genre: 'Fantasy', id: '7', authorId: '3'}
-];
-
-// dummy data
-var authors = [
-    {name: 'Patrick Rothfuss', age: 44, id: '1'},
-    {name: 'Brandon Sanderson', age: 42, id: '2'},
-    {name: 'Terry Pratchett', age: 66, id: '3'}
-];
 
 module.exports = new GraphQLSchema({
     query: RootQuery,
